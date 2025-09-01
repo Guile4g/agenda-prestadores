@@ -20,6 +20,8 @@
     .row-actions a:hover { background:#555; }
     .tip { color:#555; font-size:12px; }
     .admin-link { margin-bottom:10px; }
+    .filters { margin-top: 10px; margin-bottom: 10px; }
+    .filters label { display:inline-block; margin-right:10px; }
   </style>
   <script>
     function toggleOutro(sel){
@@ -39,6 +41,7 @@
   {% if mode == "denied" %}
     <p style="color:red;">Acesso negado.</p>
   {% else %}
+    <!-- Formulário de cadastro -->
     <form method="post">
       {% if not loja_lock %}
         <label>Loja:
@@ -86,6 +89,25 @@
 
     <div class="count">Total de registros: {{ count }}</div>
 
+    <!-- Filtros por período -->
+    <form method="get" class="filters">
+      {% if loja_lock %}
+        <input type="hidden" name="loja" value="{{ loja_lock }}">
+        <input type="hidden" name="pin" value="{{ pin }}">
+      {% endif %}
+      <label>De: <input type="date" name="inicio" value="{{ filtro_inicio }}"></label>
+      <label>Até: <input type="date" name="fim" value="{{ filtro_fim }}"></label>
+      <button type="submit">Filtrar</button>
+      <a href="{{ url_for('index', loja=loja_lock, pin=pin) }}">Limpar filtro</a>
+    </form>
+
+    <!-- Exportações -->
+    <p>
+      <a href="{{ url_for('download_csv', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">📥 Baixar CSV</a> |
+      <a href="{{ url_for('download_pdf', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">📄 Baixar PDF</a>
+    </p>
+
+    <!-- Tabela -->
     <table>
       <thead>
         <tr>
@@ -114,8 +136,6 @@
         {% endfor %}
       </tbody>
     </table>
-
-    <p><a href="{{ url_for('download_csv') }}">📥 Baixar CSV</a></p>
   {% endif %}
 </body>
 </html>
