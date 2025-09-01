@@ -1,1 +1,95 @@
-<html><body><h1>{{ title }}</h1><p>Sistema online funcionando!</p></body></html>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1 { color: #333; }
+        form { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
+        label { display: block; margin-top: 10px; }
+        input, select { padding: 5px; width: 100%; max-width: 400px; }
+        button { margin-top: 15px; padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #004c99; }
+        table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .count { margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+
+    {% if mode == "denied" %}
+        <p style="color:red;">Acesso negado.</p>
+    {% else %}
+        <form method="post">
+            {% if not loja_lock %}
+                <label>Loja:
+                    <select name="loja" required>
+                        <option value="">Selecione</option>
+                        {% for l in lojas %}
+                        <option value="{{ l }}">{{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            {% else %}
+                <input type="hidden" name="loja" value="{{ loja_lock }}">
+                <p><b>Loja:</b> {{ loja_lock }}</p>
+            {% endif %}
+
+            <label>Fornecedor/Empresa:
+                <input type="text" name="empresa" required>
+            </label>
+            <label>Funcionário:
+                <input type="text" name="funcionario" required>
+            </label>
+            <label>Data do serviço:
+                <input type="text" name="data_servico" placeholder="dd/mm/aaaa" required>
+            </label>
+            <label>Hora do serviço:
+                <input type="text" name="hora_servico" placeholder="hh:mm" required>
+            </label>
+            <label>Prazo do próximo serviço:
+                <select name="prazo">
+                    <option>1 mês</option>
+                    <option>2 meses</option>
+                    <option>3 meses</option>
+                </select>
+            </label>
+            <button type="submit">Salvar</button>
+        </form>
+
+        <div class="count">Total de registros: {{ count }}</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Loja</th>
+                    <th>Empresa</th>
+                    <th>Funcionário</th>
+                    <th>Data</th>
+                    <th>Hora</th>
+                    <th>Prazo</th>
+                    <th>Próxima Data</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ r.loja }}</td>
+                    <td>{{ r.empresa }}</td>
+                    <td>{{ r.funcionario }}</td>
+                    <td>{{ r.data_servico }}</td>
+                    <td>{{ r.hora_servico }}</td>
+                    <td>{{ r.prazo }}</td>
+                    <td>{{ r.proxima_data }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p><a href="{{ url_for('download_csv') }}">📥 Baixar CSV</a></p>
+    {% endif %}
+</body>
+</html>
