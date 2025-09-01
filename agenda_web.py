@@ -75,6 +75,7 @@ def fmt_time(s: str) -> str:
     return s
 
 def dmy_to_iso(dmy: str) -> str:
+    """Converte 'dd/mm/aaaa' -> 'aaaa-mm-dd' (para <input type=date>)"""
     try:
         d, m, a = dmy.split("/")
         return f"{a}-{m.zfill(2)}-{d.zfill(2)}"
@@ -87,7 +88,7 @@ def parse_dmy_opt(s: str):
     except Exception:
         return None
 
-# ---------- dados principais ----------
+# ---------- dados ----------
 def read_all():
     rows = []
     if CSV_PATH.exists():
@@ -155,8 +156,9 @@ def check_access(loja, pin):
         return "denied", None
     return "open", None
 
-# ---------- filtro util ----------
+# ---------- filtro ----------
 def apply_period_filter(rows, inicio_iso: str, fim_iso: str):
+    """Filtra rows pelo intervalo [inicio, fim] (datas 'aaaa-mm-dd')."""
     if not (inicio_iso and fim_iso):
         return rows
     try:
@@ -330,4 +332,118 @@ def fornecedores_admin():
     pin = request.args.get("pin","").strip()
     mode, _ = check_access("", pin)
     if mode != "admin":
-        return abort(403, descri
+        # <<< ESTA LINHA ESTAVA CORTADA NO SEU ARQUIVO >>>
+        return abort(403, description="Somente admin")
+
+    items = read_suppliers()
+
+    if request.method == "POST":
+        novo = request.form.get("novo","").strip()
+        if novo:
+            novo_norm = " ".join(p.capitalize() for p in novo.split())
+            if novo_norm not in items:
+                items.append(novo_norm)
+                write_suppliers(items)
+        return redirect(url_for("fornecedores_admin", pin=pin))
+
+    action = request.args.get("action","")
+    idx = request.args.get("idx","")
+    if action == "del" and idx.isdigit():
+        i = int(idx)
+        if 0 <= i < len(items):
+            del items[i]
+            write_suppliers(items)
+        return redirect(url_for("fornecedores_admin", pin=pin))
+
+    html = ["<h2>Catálogo de Fornecedores (Admin)</h2>",
+            "<form method='post'>Adicionar fornecedor:<br>",
+            "<input name='novo' style='width:300px'> ",
+            "<button>Adicionar</button></form><hr>",
+            "<ol>"]
+    for i, name in enumerate(items):
+        link_del = url_for('fornecedores_admin', pin=pin, action='del', idx=i)
+        html.append(f"<li>{name} &nbsp; <a href='{link_del}' onclick=\"return confirm('Remover?');\">remover</a></li>")
+    html.append("</ol>")
+    back = url_for('index', pin=pin)
+    html.append(f"<p><a href='{back}'>Voltar</a></p>")
+    return "\n".join(html)
+
+# ---------- exportações ----------
+@app.route("/download/csv")
+def download_csv():
+    loja_lock = request.args.get("loja","").strip()
+    pin = request.args.get("pin","").strip()
+    inicio = request.args.get("inicio","").strip()
+    fim = request.args.get("fim","").strip()
+
+    mode, loja_autorizada = check_access(loja_lock, pin)
+    if mode == "denied":
+        return abort(403)
+
+    rows = read_all()
+    if loja_autorizada:
+        rows = [r for r in rows if r.get("loja","") == loja_autorizada]
+    rows = apply_period_filter(rows, inicio, fim)
+
+    si = io.StringIO()
+    writer = csv.writer(si)
+    writer.writerow(["loja","empresa","funcionario","data_servico","hora_servico","prazo","proxima_data"])
+    for r in rows:
+        writer.writerow([r["loja"], r["empresa"], r["funcionario"],
+                         r["data_servico"], r["hora_servico"], r["prazo"], r["proxima_data"]])
+    output = si.getvalue().encode("utf-8")
+    return Response(
+        output,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment;filename=relatorio.csv"}
+    )
+
+@app.route("/download/pdf")
+def download_pdf():
+    loja_lock = request.args.get("loja","").strip()
+    pin = request.args.get("pin","").strip()
+    inicio = request.args.get("inicio","").strip()
+    fim = request.args.get("fim","").strip()
+
+    mode, loja_autorizada = check_access(loja_lock, pin)
+    if mode == "denied":
+        return abort(403)
+
+    rows = read_all()
+    if loja_autorizada:
+        rows = [r for r in rows if r.get("loja","") == loja_autorizada]
+    rows = apply_period_filter(rows, inicio, fim)
+
+    pdf_file = "relatorio.pdf"
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+    title = "Relatório - Agenda de Prestadores"
+    if inicio and fim:
+        title += f" (De {inicio} até {fim})"
+    elements.append(Paragraph(title, styles["Heading1"]))
+    elements.append(Spacer(1,12))
+
+    data = [["Loja","Empresa","Funcionário","Data","Hora","Prazo","Próxima Data"]]
+    for r in rows:
+        data.append([r["loja"], r["empresa"], r["funcionario"],
+                     r["data_servico"], r["hora_servico"], r["prazo"], r["proxima_data"]])
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),colors.grey),
+        ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("BOTTOMPADDING",(0,0),(-1,0),12),
+        ("BACKGROUND",(0,1),(-1,-1),colors.whitesmoke),
+        ("GRID",(0,0),(-1,-1),1,colors.black),
+    ]))
+    elements.append(table)
+    doc.build(elements)
+
+    return send_file(pdf_file, as_attachment=True)
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5000"))
+    app.run(host="0.0.0.0", port=port)
