@@ -33,6 +33,7 @@ except Exception:
 
 app = Flask(__name__)
 
+# ---------- util ----------
 def add_months(dt: datetime, months: int) -> datetime:
     month = dt.month - 1 + months
     year = dt.year + month // 12
@@ -45,13 +46,13 @@ def add_months(dt: datetime, months: int) -> datetime:
 def fmt_date(s: str) -> str:
     s = (s or "").strip()
     if not s: return ""
-    if "-" in s and len(s) == 10:
+    if "-" in s and len(s) == 10:  # yyyy-mm-dd -> dd/mm/aaaa
         a, m, d = s.split("-")
         return f"{d}/{m}/{a}"
-    if "/" in s and len(s) == 10:
+    if "/" in s and len(s) == 10:  # dd/mm/aaaa
         d, m, a = s.split("/")
         return f"{d.zfill(2)}/{m.zfill(2)}/{a}"
-    if s.isdigit() and len(s) == 8:
+    if s.isdigit() and len(s) == 8:  # ddmmyyyy
         d, m, a = s[:2], s[2:4], s[4:]
         return f"{d}/{m}/{a}"
     return s
@@ -68,6 +69,14 @@ def fmt_time(s: str) -> str:
     if s.isdigit() and len(s) in (1,2):
         return f"{s.zfill(2)}:00"
     return s
+
+def dmy_to_iso(dmy: str) -> str:
+    """Converte 'dd/mm/aaaa' -> 'aaaa-mm-dd' (para preencher <input type=date>)"""
+    try:
+        d, m, a = dmy.split("/")
+        return f"{a}-{m.zfill(2)}-{d.zfill(2)}"
+    except Exception:
+        return ""
 
 def read_all():
     rows = []
@@ -100,6 +109,7 @@ def write_all(rows):
             r["hora_servico"] = fmt_time(r.get("hora_servico",""))
             writer.writerow(r)
 
+# ---------- catálogo de fornecedores ----------
 def read_suppliers():
     items = []
     if SUPPLIERS_CSV.exists():
@@ -125,6 +135,7 @@ def write_suppliers(items):
         for it in items:
             wr.writerow([it.strip()])
 
+# ---------- acesso ----------
 def check_access(loja, pin):
     if pin == ADMIN_PIN and ADMIN_PIN:
         return "admin", None
@@ -134,8 +145,7 @@ def check_access(loja, pin):
         return "denied", None
     return "open", None
 
-app = Flask(__name__)
-
+# ---------- rotas ----------
 @app.route("/", methods=["GET","POST"])
 def index():
     loja_lock = request.args.get("loja","").strip()
@@ -207,6 +217,78 @@ def delete(idx):
         write_all(rows)
     return redirect(url_for("index", loja=loja_lock, pin=pin))
 
+# --------- EDITAR REGISTRO ---------
+@app.route("/edit/<int:idx>", methods=["GET","POST"])
+def edit(idx):
+    loja_lock = request.args.get("loja","").strip()
+    pin = request.args.get("pin","").strip()
+    mode, loja_autorizada = check_access(loja_lock, pin)
+    if mode == "denied":
+        return abort(403)
+
+    rows = read_all()
+    if not (0 <= idx < len(rows)):
+        return abort(404)
+
+    row = rows[idx]
+    # Permissão: se estiver em modo "loja", só pode editar a própria loja
+    if loja_autorizada and row.get("loja","") != loja_autorizada:
+        return abort(403)
+
+    fornecedores = read_suppliers()
+
+    if request.method == "POST":
+        loja = loja_autorizada or request.form.get("loja","").strip()
+        empresa_sel = request.form.get("empresa_sel","").strip()
+        empresa_outro = request.form.get("empresa_outro","").strip()
+        empresa = empresa_outro if empresa_outro else empresa_sel
+
+        def norm_name(x: str) -> str:
+            return " ".join(part.capitalize() for part in x.split())
+        empresa = norm_name(empresa)
+
+        funcionario = request.form.get("funcionario","").strip()
+        data_servico = fmt_date(request.form.get("data_servico",""))
+        hora_servico = fmt_time(request.form.get("hora_servico",""))
+        prazo = request.form.get("prazo","1 mês").strip()
+
+        if empresa and empresa not in fornecedores:
+            fornecedores.append(empresa)
+            write_suppliers(fornecedores)
+
+        proxima_data = ""
+        try:
+            base_dt = datetime.strptime(f"{data_servico} {hora_servico}", f"{DATE_FMT} {TIME_FMT}")
+            nxt = add_months(base_dt, {"1 mês":1,"2 meses":2,"3 meses":3}.get(prazo,1))
+            proxima_data = nxt.strftime(DATE_FMT)
+        except Exception:
+            proxima_data = ""
+
+        # Atualiza o registro
+        rows[idx] = {
+            "loja": loja, "empresa": empresa, "funcionario": funcionario,
+            "data_servico": data_servico, "hora_servico": hora_servico,
+            "prazo": prazo, "proxima_data": proxima_data
+        }
+        write_all(rows)
+        return redirect(url_for("index", loja=loja_lock, pin=pin))
+
+    # Preparar valores para preencher o form
+    prefilled = {
+        "loja": row.get("loja",""),
+        "empresa": row.get("empresa",""),
+        "funcionario": row.get("funcionario",""),
+        "data_iso": dmy_to_iso(row.get("data_servico","")),
+        "hora": row.get("hora_servico",""),
+        "prazo": row.get("prazo","1 mês"),
+    }
+    return render_template("edit.html",
+                           title=APP_TITLE, idx=idx,
+                           lojas=LOJAS, fornecedores=fornecedores,
+                           loja_lock=loja_autorizada, mode=mode, pin=pin,
+                           form=prefilled)
+
+# ----- tela simples para gerir fornecedores (apenas admin) -----
 @app.route("/fornecedores", methods=["GET","POST"])
 def fornecedores_admin():
     pin = request.args.get("pin","").strip()
