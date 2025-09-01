@@ -16,6 +16,8 @@
     th { background: #f0f0f0; }
     .count { margin-top: 10px; font-weight: bold; }
     .row-actions form { display:inline; }
+    .row-actions a { display:inline-block; margin-right:6px; background:#777; color:#fff; padding:6px 10px; border-radius:5px; text-decoration:none; }
+    .row-actions a:hover { background:#555; }
     .tip { color:#555; font-size:12px; }
     .admin-link { margin-bottom:10px; }
   </style>
@@ -101,6 +103,7 @@
           <td>{{ r.prazo }}</td>
           <td>{{ r.proxima_data }}</td>
           <td class="row-actions">
+            <a href="{{ url_for('edit', idx=loop.index0, loja=loja_lock, pin=pin) }}">Editar</a>
             <form method="post" action="{{ url_for('delete', idx=loop.index0, loja=loja_lock, pin=pin) }}" onsubmit="return confirm('Remover este registro?');">
               <button type="submit" style="background:#cc0000">Remover</button>
             </form>
