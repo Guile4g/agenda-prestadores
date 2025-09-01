@@ -8,7 +8,7 @@
         h1 { color: #333; }
         form { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; }
         label { display: block; margin-top: 10px; }
-        input, select { padding: 5px; width: 100%; max-width: 400px; }
+        input, select { padding: 6px; width: 100%; max-width: 420px; }
         button { margin-top: 15px; padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
         button:hover { background: #004c99; }
         table { border-collapse: collapse; width: 100%; margin-top: 20px; }
@@ -44,12 +44,15 @@
             <label>Funcionário:
                 <input type="text" name="funcionario" required>
             </label>
+
+            <!-- Campos com tipos 'date' e 'time' para ajudar no formato -->
             <label>Data do serviço:
-                <input type="text" name="data_servico" placeholder="dd/mm/aaaa" required>
+                <input type="date" name="data_servico" required>
             </label>
             <label>Hora do serviço:
-                <input type="text" name="hora_servico" placeholder="hh:mm" required>
+                <input type="time" name="hora_servico" required>
             </label>
+
             <label>Prazo do próximo serviço:
                 <select name="prazo">
                     <option>1 mês</option>
@@ -80,6 +83,7 @@
                     <td>{{ r.loja }}</td>
                     <td>{{ r.empresa }}</td>
                     <td>{{ r.funcionario }}</td>
+                    <!-- aqui já vem formatado bonitinho do servidor -->
                     <td>{{ r.data_servico }}</td>
                     <td>{{ r.hora_servico }}</td>
                     <td>{{ r.prazo }}</td>
