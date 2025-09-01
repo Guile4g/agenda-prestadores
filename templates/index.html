@@ -125,8 +125,8 @@
           <td>{{ r.prazo }}</td>
           <td>{{ r.proxima_data }}</td>
           <td class="row-actions">
-            <a href="{{ url_for('edit', idx=loop.index0, loja=loja_lock, pin=pin) }}">Editar</a>
-            <form method="post" action="{{ url_for('delete', idx=loop.index0, loja=loja_lock, pin=pin) }}" onsubmit="return confirm('Remover este registro?');">
+            <a href="{{ url_for('edit', idx=loop.index0, loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">Editar</a>
+            <form method="post" action="{{ url_for('delete', idx=loop.index0, loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}" onsubmit="return confirm('Remover este registro?');">
               <button type="submit" style="background:#cc0000">Remover</button>
             </form>
           </td>
