@@ -1,7 +1,11 @@
 import os, json, csv
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, request, redirect, url_for, send_file, abort
+from flask import Flask, render_template, request, redirect, url_for, send_file, abort, make_response
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 
 APP_TITLE = "Agenda de Prestadores"
 DATE_FMT = "%d/%m/%Y"
@@ -156,186 +160,86 @@ def index():
 
     fornecedores = read_suppliers()
 
-    if request.method == "POST":
-        loja = loja_autorizada or request.form.get("loja","").strip()
-        empresa_sel = request.form.get("empresa_sel","").strip()
-        empresa_outro = request.form.get("empresa_outro","").strip()
-        empresa = empresa_outro if empresa_outro else empresa_sel
-
-        def norm_name(x: str) -> str:
-            return " ".join(part.capitalize() for part in x.split())
-        empresa = norm_name(empresa)
-
-        funcionario = request.form.get("funcionario","").strip()
-        data_servico = fmt_date(request.form.get("data_servico",""))
-        hora_servico = fmt_time(request.form.get("hora_servico",""))
-        prazo = request.form.get("prazo","1 mês").strip()
-
-        if empresa and empresa not in fornecedores:
-            fornecedores.append(empresa)
-            write_suppliers(fornecedores)
-
-        proxima_data = ""
-        try:
-            base_dt = datetime.strptime(f"{data_servico} {hora_servico}", f"{DATE_FMT} {TIME_FMT}")
-            nxt = add_months(base_dt, {"1 mês":1,"2 meses":2,"3 meses":3}.get(prazo,1))
-            proxima_data = nxt.strftime(DATE_FMT)
-        except Exception:
-            proxima_data = ""
-
-        rows = read_all()
-        rows.append({
-            "loja": loja, "empresa": empresa, "funcionario": funcionario,
-            "data_servico": data_servico, "hora_servico": hora_servico,
-            "prazo": prazo, "proxima_data": proxima_data
-        })
-        write_all(rows)
-        return redirect(url_for("index", loja=loja_lock, pin=pin))
+    # --- filtros ---
+    filtro_inicio = request.args.get("inicio","").strip()
+    filtro_fim = request.args.get("fim","").strip()
 
     rows = read_all()
     if loja_autorizada:
         rows = [r for r in rows if r.get("loja","") == loja_autorizada]
 
+    # aplicar filtro por período
+    if filtro_inicio and filtro_fim:
+        try:
+            di = datetime.strptime(filtro_inicio, "%Y-%m-%d")
+            df = datetime.strptime(filtro_fim, "%Y-%m-%d")
+            def parse_dmy(s):
+                try:
+                    return datetime.strptime(s, "%d/%m/%Y")
+                except: return None
+            rows = [r for r in rows if (d:=parse_dmy(r.get("data_servico",""))) and di <= d <= df]
+        except: pass
+
     return render_template("index.html", title=APP_TITLE, lojas=LOJAS,
                            rows=rows, count=len(rows),
                            loja_lock=loja_autorizada, mode=mode, pin=pin,
-                           fornecedores=fornecedores)
+                           fornecedores=fornecedores,
+                           filtro_inicio=filtro_inicio, filtro_fim=filtro_fim)
 
-@app.route("/delete/<int:idx>", methods=["POST"])
-def delete(idx):
+# ---------- exportar PDF ----------
+@app.route("/download/pdf")
+def download_pdf():
     loja_lock = request.args.get("loja","").strip()
     pin = request.args.get("pin","").strip()
     mode, loja_autorizada = check_access(loja_lock, pin)
     if mode == "denied":
         return abort(403)
 
-    rows = read_all()
-    if 0 <= idx < len(rows):
-        if loja_autorizada and rows[idx].get("loja","") != loja_autorizada:
-            return abort(403)
-        del rows[idx]
-        write_all(rows)
-    return redirect(url_for("index", loja=loja_lock, pin=pin))
-
-# --------- EDITAR REGISTRO ---------
-@app.route("/edit/<int:idx>", methods=["GET","POST"])
-def edit(idx):
-    loja_lock = request.args.get("loja","").strip()
-    pin = request.args.get("pin","").strip()
-    mode, loja_autorizada = check_access(loja_lock, pin)
-    if mode == "denied":
-        return abort(403)
+    filtro_inicio = request.args.get("inicio","").strip()
+    filtro_fim = request.args.get("fim","").strip()
 
     rows = read_all()
-    if not (0 <= idx < len(rows)):
-        return abort(404)
+    if loja_autorizada:
+        rows = [r for r in rows if r.get("loja","") == loja_autorizada]
 
-    row = rows[idx]
-    # Permissão: se estiver em modo "loja", só pode editar a própria loja
-    if loja_autorizada and row.get("loja","") != loja_autorizada:
-        return abort(403)
-
-    fornecedores = read_suppliers()
-
-    if request.method == "POST":
-        loja = loja_autorizada or request.form.get("loja","").strip()
-        empresa_sel = request.form.get("empresa_sel","").strip()
-        empresa_outro = request.form.get("empresa_outro","").strip()
-        empresa = empresa_outro if empresa_outro else empresa_sel
-
-        def norm_name(x: str) -> str:
-            return " ".join(part.capitalize() for part in x.split())
-        empresa = norm_name(empresa)
-
-        funcionario = request.form.get("funcionario","").strip()
-        data_servico = fmt_date(request.form.get("data_servico",""))
-        hora_servico = fmt_time(request.form.get("hora_servico",""))
-        prazo = request.form.get("prazo","1 mês").strip()
-
-        if empresa and empresa not in fornecedores:
-            fornecedores.append(empresa)
-            write_suppliers(fornecedores)
-
-        proxima_data = ""
+    if filtro_inicio and filtro_fim:
         try:
-            base_dt = datetime.strptime(f"{data_servico} {hora_servico}", f"{DATE_FMT} {TIME_FMT}")
-            nxt = add_months(base_dt, {"1 mês":1,"2 meses":2,"3 meses":3}.get(prazo,1))
-            proxima_data = nxt.strftime(DATE_FMT)
-        except Exception:
-            proxima_data = ""
+            di = datetime.strptime(filtro_inicio, "%Y-%m-%d")
+            df = datetime.strptime(filtro_fim, "%Y-%m-%d")
+            def parse_dmy(s):
+                try: return datetime.strptime(s, "%d/%m/%Y")
+                except: return None
+            rows = [r for r in rows if (d:=parse_dmy(r.get("data_servico",""))) and di <= d <= df]
+        except: pass
 
-        # Atualiza o registro
-        rows[idx] = {
-            "loja": loja, "empresa": empresa, "funcionario": funcionario,
-            "data_servico": data_servico, "hora_servico": hora_servico,
-            "prazo": prazo, "proxima_data": proxima_data
-        }
-        write_all(rows)
-        return redirect(url_for("index", loja=loja_lock, pin=pin))
+    # gerar PDF
+    buf = []
+    pdf_file = "relatorio.pdf"
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
 
-    # Preparar valores para preencher o form
-    prefilled = {
-        "loja": row.get("loja",""),
-        "empresa": row.get("empresa",""),
-        "funcionario": row.get("funcionario",""),
-        "data_iso": dmy_to_iso(row.get("data_servico","")),
-        "hora": row.get("hora_servico",""),
-        "prazo": row.get("prazo","1 mês"),
-    }
-    return render_template("edit.html",
-                           title=APP_TITLE, idx=idx,
-                           lojas=LOJAS, fornecedores=fornecedores,
-                           loja_lock=loja_autorizada, mode=mode, pin=pin,
-                           form=prefilled)
+    elements.append(Paragraph("Relatório - Agenda de Prestadores", styles["Heading1"]))
+    elements.append(Spacer(1,12))
 
-# ----- tela simples para gerir fornecedores (apenas admin) -----
-@app.route("/fornecedores", methods=["GET","POST"])
-def fornecedores_admin():
-    pin = request.args.get("pin","").strip()
-    mode, _ = check_access("", pin)
-    if mode != "admin":
-        return abort(403, description="Somente admin")
+    data = [["Loja","Empresa","Funcionário","Data","Hora","Prazo","Próxima Data"]]
+    for r in rows:
+        data.append([r["loja"],r["empresa"],r["funcionario"],r["data_servico"],
+                     r["hora_servico"],r["prazo"],r["proxima_data"]])
 
-    items = read_suppliers()
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,0),colors.grey),
+        ("TEXTCOLOR",(0,0),(-1,0),colors.whitesmoke),
+        ("ALIGN",(0,0),(-1,-1),"CENTER"),
+        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("BOTTOMPADDING",(0,0),(-1,0),12),
+        ("BACKGROUND",(0,1),(-1,-1),colors.beige),
+        ("GRID",(0,0),(-1,-1),1,colors.black),
+    ]))
 
-    if request.method == "POST":
-        novo = request.form.get("novo","").strip()
-        if novo:
-            novo_norm = " ".join(p.capitalize() for p in novo.split())
-            if novo_norm not in items:
-                items.append(novo_norm)
-                write_suppliers(items)
-        return redirect(url_for("fornecedores_admin", pin=pin))
+    elements.append(table)
+    doc.build(elements)
 
-    action = request.args.get("action","")
-    idx = request.args.get("idx","")
-    if action == "del" and idx.isdigit():
-        i = int(idx)
-        if 0 <= i < len(items):
-            del items[i]
-            write_suppliers(items)
-        return redirect(url_for("fornecedores_admin", pin=pin))
+    return send_file(pdf_file, as_attachment=True)
 
-    html = ["<h2>Catálogo de Fornecedores (Admin)</h2>",
-            "<form method='post'>Adicionar fornecedor:<br>",
-            "<input name='novo' style='width:300px'> ",
-            "<button>Adicionar</button></form><hr>",
-            "<ol>"]
-    for i, name in enumerate(items):
-        link_del = url_for('fornecedores_admin', pin=pin, action='del', idx=i)
-        html.append(f"<li>{name} &nbsp; <a href='{link_del}' onclick=\"return confirm('Remover?');\">remover</a></li>")
-    html.append("</ol>")
-    back = url_for('index', pin=pin)
-    html.append(f"<p><a href='{back}'>Voltar</a></p>")
-    return "\n".join(html)
-
-@app.route("/download/csv")
-def download_csv():
-    if not CSV_PATH.exists():
-        with CSV_PATH.open("w", newline="", encoding="utf-8") as f:
-            csv.writer(f).writerow(["loja","empresa","funcionario","data_servico","hora_servico","prazo","proxima_data"])
-    return send_file(str(CSV_PATH), as_attachment=True, download_name="servicos_web.csv")
-
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", "5000"))
-    app.run(host="0.0.0.0", port=port)
