@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: agenda-prestadores
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn agenda_web:app
