@@ -1,1 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Editar registro — {{ title }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    form { margin-top: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; max-width: 700px; }
+    label { display: block; margin-top: 10px; }
+    input, select { padding: 6px; width: 100%; max-width: 420px; }
+    button { margin-top: 15px; padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #004c99; }
+    .tip { color:#555; font-size:12px; }
+    .row { margin-bottom:8px; }
+    a.bt { display:inline-block; margin-top:10px; background:#777; color:#fff; padding:8px 12px; border-radius:5px; text-decoration:none; }
+    a.bt:hover { background:#555; }
+  </style>
+  <script>
+    function toggleOutro(sel){
+      var outroWrap = document.getElementById('outro-wrap');
+      if(sel.value === '__OUTRO__'){ outroWrap.style.display='block'; }
+      else { outroWrap.style.display='none'; }
+    }
+  </script>
+</head>
+<body>
+  <h1>Editar registro — {{ title }}</h1>
+
+  <form method="post">
+    {% if not loja_lock %}
+      <label>Loja:
+        <select name="loja" required>
+          {% for l in lojas %}
+            <option value="{{ l }}" {% if l == form.loja %}selected{% endif %}>{{ l }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    {% else %}
+      <input type="hidden" name="loja" value="{{ form.loja }}">
+      <p><b>Loja:</b> {{ form.loja }}</p>
+    {% endif %}
+
+    <label>Fornecedor/Empresa:
+      <select name="empresa_sel" onchange="toggleOutro(this)">
+        <option value="">Selecione</option>
+        {% for f in fornecedores %}
+          <option value="{{ f }}" {% if f == form.empresa %}selected{% endif %}>{{ f }}</option>
+        {% endfor %}
+        <option value="__OUTRO__">Outro (digitar)…</option>
+      </select>
+      <div id="outro-wrap" style="display:none; margin-top:6px;">
+        <input type="text" name="empresa_outro" placeholder="Digite o nome do fornecedor">
+        <div class="tip">Se quiser padronizar um novo nome, digite aqui e ele será adicionado ao catálogo.</div>
+      </div>
+    </label>
+
+    <label>Funcionário:
+      <input type="text" name="funcionario" value="{{ form.funcionario }}" required>
+    </label>
+
+    <label>Data do serviço:
+      <input type="date" name="data_servico" value="{{ form.data_iso }}" required>
+    </label>
+    <label>Hora do serviço:
+      <input type="time" name="hora_servico" value="{{ form.hora }}" required>
+    </label>
+
+    <label>Prazo do próximo serviço:
+      <select name="prazo">
+        <option {% if form.prazo == '1 mês' %}selected{% endif %}>1 mês</option>
+        <option {% if form.prazo == '2 meses' %}selected{% endif %}>2 meses</option>
+        <option {% if form.prazo == '3 meses' %}selected{% endif %}>3 meses</option>
+      </select>
+    </label>
+
+    <button type="submit">Salvar alterações</button>
+    <a class="bt" href="{{ url_for('index', loja=loja_lock, pin=pin) }}">Cancelar</a>
+  </form>
+</body>
+</html>
 
