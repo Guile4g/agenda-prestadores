@@ -1,80 +1,71 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
   <meta charset="UTF-8">
-  <title>Editar registro — {{ title }}</title>
+  <title>Editar Registro</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { color: #333; }
-    form { margin-top: 10px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; background: #f9f9f9; max-width: 700px; }
-    label { display: block; margin-top: 10px; }
-    input, select { padding: 6px; width: 100%; max-width: 420px; }
-    button { margin-top: 15px; padding: 10px 20px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    button:hover { background: #004c99; }
-    .tip { color:#555; font-size:12px; }
-    a.bt { display:inline-block; margin-top:10px; background:#777; color:#fff; padding:8px 12px; border-radius:5px; text-decoration:none; }
-    a.bt:hover { background:#555; }
+    form { margin-top: 8px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; background:#fafafa; max-width: 640px; }
+    label { display:block; margin-top:8px; }
+    input, select, textarea { width: 100%; max-width: 520px; padding:6px; }
+    textarea { height: 80px; }
+    .btn { display:inline-block; padding: 6px 12px; margin-top: 10px; cursor: pointer; border: none; border-radius: 4px; }
+    .btn-primary { background:#007BFF; color:#fff; }
   </style>
   <script>
-    function toggleOutro(sel){
-      var outroWrap = document.getElementById('outro-wrap');
-      if(sel.value === '__OUTRO__'){ outroWrap.style.display='block'; }
-      else { outroWrap.style.display='none'; }
+    function togglePersonalizado(value){
+      const lab = document.getElementById("personalizado_label");
+      const inp = document.getElementById("personalizado_input");
+      if(value === "personalizado"){ lab.style.display="block"; inp.style.display="block"; }
+      else { lab.style.display="none"; inp.style.display="none"; }
     }
+    window.addEventListener('DOMContentLoaded', function(){
+      const sel = document.getElementById('prazo_sel');
+      togglePersonalizado(sel.value);
+    });
   </script>
 </head>
 <body>
-  <h1>Editar registro — {{ title }}</h1>
+  <h2>Editar Registro</h2>
+  <form method="POST">
+    <label>Loja</label>
+    <input type="text" value="{{ registro.loja }}" readonly>
 
-  <form method="post">
-    {% if not loja_lock %}
-      <label>Loja:
-        <select name="loja" required>
-          {% for l in lojas %}
-            <option value="{{ l }}" {% if l == form.loja %}selected{% endif %}>{{ l }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    {% else %}
-      <input type="hidden" name="loja" value="{{ form.loja }}">
-      <p><b>Loja:</b> {{ form.loja }}</p>
-    {% endif %}
+    <label>Fornecedor</label>
+    <select name="empresa" required>
+      {% for f in fornecedores %}
+        <option value="{{ f }}" {% if f == registro.empresa %}selected{% endif %}>{{ f }}</option>
+      {% endfor %}
+    </select>
 
-    <label>Fornecedor/Empresa:
-      <select name="empresa_sel" onchange="toggleOutro(this)">
-        <option value="">Selecione</option>
-        {% for f in fornecedores %}
-          <option value="{{ f }}" {% if f == form.empresa %}selected{% endif %}>{{ f }}</option>
-        {% endfor %}
-        <option value="__OUTRO__">Outro (digitar)…</option>
-      </select>
-      <div id="outro-wrap" style="display:none; margin-top:6px;">
-        <input type="text" name="empresa_outro" placeholder="Digite o nome do fornecedor">
-        <div class="tip">Se digitar um novo nome, ele entra no catálogo automaticamente.</div>
-      </div>
-    </label>
+    <label>Funcionário</label>
+    <input type="text" name="funcionario" value="{{ registro.funcionario }}" required>
 
-    <label>Funcionário:
-      <input type="text" name="funcionario" value="{{ form.funcionario }}" required>
-    </label>
+    <label>Data</label>
+    <input type="date" name="data" value="{{ registro.data|dmy_to_iso }}" required>
 
-    <label>Data do serviço:
-      <input type="date" name="data_servico" value="{{ form.data_iso }}" required>
-    </label>
-    <label>Hora do serviço:
-      <input type="time" name="hora_servico" value="{{ form.hora }}" required>
-    </label>
+    <label>Hora</label>
+    <input type="time" name="hora" value="{{ registro.hora }}" required>
 
-    <label>Prazo do próximo serviço:
-      <select name="prazo">
-        <option {% if form.prazo == '1 mês' %}selected{% endif %}>1 mês</option>
-        <option {% if form.prazo == '2 meses' %}selected{% endif %}>2 meses</option>
-        <option {% if form.prazo == '3 meses' %}selected{% endif %}>3 meses</option>
-      </select>
-    </label>
+    <label>Prazo do próximo serviço</label>
+    {% set is_custom = ('meses' in registro.prazo and registro.prazo not in ['15 dias','1 mês','2 meses','3 meses','6 meses','12 meses']) %}
+    <select name="prazo" id="prazo_sel" onchange="togglePersonalizado(this.value)">
+      <option value="15 dias"  {% if registro.prazo == '15 dias' %}selected{% endif %}>15 dias</option>
+      <option value="1 mês"    {% if registro.prazo == '1 mês' %}selected{% endif %}>1 mês</option>
+      <option value="2 meses"  {% if registro.prazo == '2 meses' %}selected{% endif %}>2 meses</option>
+      <option value="3 meses"  {% if registro.prazo == '3 meses' %}selected{% endif %}>3 meses</option>
+      <option value="6 meses"  {% if registro.prazo == '6 meses' %}selected{% endif %}>6 meses</option>
+      <option value="12 meses" {% if registro.prazo == '12 meses' %}selected{% endif %}>12 meses</option>
+      <option value="personalizado" {% if is_custom %}selected{% endif %}>Personalizado (meses)</option>
+    </select>
+    <label id="personalizado_label" style="display:none;">Informe os meses (número)</label>
+    <input type="number" name="personalizado" id="personalizado_input" min="1"
+           value="{% if is_custom %}{{ registro.prazo.split()[0] }}{% endif %}" placeholder="Ex.: 8" style="display:none;">
 
-    <button type="submit">Salvar alterações</button>
-    <a class="bt" href="{{ url_for('index', loja=loja_lock, pin=pin) }}">Cancelar</a>
+    <label>Observações</label>
+    <textarea name="observacoes">{{ registro.observacoes }}</textarea>
+
+    <button type="submit" class="btn btn-primary">Salvar</button>
   </form>
 </body>
 </html>
