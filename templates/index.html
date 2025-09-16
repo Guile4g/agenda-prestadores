@@ -1,128 +1,162 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-    <meta charset="UTF-8">
-    <title>Agenda de Prestadores</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        label { display: block; margin-top: 10px; }
-        input, select, textarea { padding: 5px; margin-top: 5px; width: 300px; }
-        button { margin-top: 15px; padding: 8px 15px; }
-        table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    </style>
+  <meta charset="UTF-8">
+  <title>{{ title }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 20px; }
+    form { margin-bottom: 16px; padding: 12px; border: 1px solid #ddd; border-radius: 6px; background:#fafafa; }
+    label { display:block; margin-top:8px; }
+    input, select, textarea { width: 100%; max-width: 460px; padding:6px; }
+    textarea { height: 70px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #f4f4f4; }
+    .btn { display:inline-block; padding: 6px 12px; margin-top: 10px; cursor: pointer; border: none; border-radius: 4px; }
+    .btn-primary { background:#007BFF; color:#fff; }
+    .btn-danger { background:#cc0000; color:#fff; }
+    .btn-secondary { background:#6c757d; color:#fff; }
+    .actions { display:flex; gap:6px; justify-content:center; }
+    .filters label { display:inline-block; margin-right:10px; }
+    .tip { color:#666; font-size:12px; }
+    .admin-link { margin: 10px 0; }
+  </style>
+  <script>
+    function togglePersonalizado(value){
+      const lab = document.getElementById("personalizado_label");
+      const inp = document.getElementById("personalizado_input");
+      if(value === "personalizado"){ lab.style.display="block"; inp.style.display="block"; }
+      else { lab.style.display="none"; inp.style.display="none"; inp.value=""; }
+    }
+  </script>
 </head>
 <body>
-    <h1>Agenda de Prestadores</h1>
+  <h2>{{ title }}</h2>
 
-    <!-- Formulário -->
-    <form method="post">
-        <label>Loja:
-            <select name="loja" required>
-                <option value="">Selecione</option>
-                <option value="4g Comércio de Alimentos e Bebidas Ltda">4g Comércio de Alimentos e Bebidas Ltda</option>
-                <option value="Tenro Plaza Niterói Ltda">Tenro Plaza Niterói Ltda</option>
-                <option value="Gdm Cafés e Bolos Ltda">Gdm Cafés e Bolos Ltda</option>
-                <option value="Tenro Café Américas">Tenro Café Américas</option>
-            </select>
+  {% if mode == "admin" %}
+    <p class="admin-link">🔧 <a href="{{ url_for('fornecedores_admin', pin=pin) }}">Gerenciar fornecedores (admin)</a></p>
+  {% endif %}
+
+  <!-- Formulário -->
+  <form method="POST">
+    {% if mode == "loja" and loja_lock %}
+      <input type="hidden" name="loja" value="{{ loja_lock }}">
+      <p><b>Loja:</b> {{ loja_lock }}</p>
+    {% else %}
+      {% if mode == "admin" %}
+        <label>Loja
+          <select name="loja" required>
+            <option value="">Selecione...</option>
+            {% for loja in lojas %}
+              <option value="{{ loja }}">{{ loja }}</option>
+            {% endfor %}
+          </select>
         </label>
+      {% endif %}
+    {% endif %}
 
-        <label>Fornecedor/Empresa:
-            <input type="text" name="empresa" required>
-        </label>
+    <label>Fornecedor (apenas da lista do gestor)
+      <select name="empresa" required>
+        <option value="">Selecione...</option>
+        {% for f in fornecedores %}
+          <option value="{{ f }}">{{ f }}</option>
+        {% endfor %}
+      </select>
+      <div class="tip">Para incluir fornecedor novo, use a tela do gestor: /fornecedores?pin=9999</div>
+    </label>
 
-        <label>Funcionário:
-            <input type="text" name="funcionario" required>
-        </label>
+    <label>Funcionário
+      <input type="text" name="funcionario" required>
+    </label>
 
-        <label>Data do serviço:
-            <input type="date" name="data" required>
-        </label>
+    <label>Data
+      <input type="date" name="data" required>
+    </label>
 
-        <label>Hora do serviço:
-            <input type="time" name="hora" required>
-        </label>
+    <label>Hora
+      <input type="time" name="hora" required>
+    </label>
 
-        <label>Prazo do próximo serviço:</label>
-        <select name="prazo" id="prazo">
-            <option value="15 dias">15 dias</option>
-            <option value="1 mês">1 mês</option>
-            <option value="2 meses">2 meses</option>
-            <option value="3 meses">3 meses</option>
-            <option value="6 meses">6 meses</option>
-            <option value="12 meses">12 meses</option>
-            <option value="personalizado">Personalizado (meses)</option>
-        </select>
+    <label>Prazo do próximo serviço
+      <select name="prazo" onchange="togglePersonalizado(this.value)" required>
+        <option value="">Selecione...</option>
+        <option value="15 dias">15 dias</option>
+        <option value="1 mês">1 mês</option>
+        <option value="2 meses">2 meses</option>
+        <option value="3 meses">3 meses</option>
+        <option value="6 meses">6 meses</option>
+        <option value="12 meses">12 meses</option>
+        <option value="personalizado">Personalizado (meses)</option>
+      </select>
+    </label>
+    <label id="personalizado_label" style="display:none;">Informe os meses (número)</label>
+    <input type="number" name="personalizado" id="personalizado_input" min="1" placeholder="Ex.: 8" style="display:none;">
 
-        <input type="number" id="personalizado" name="personalizado" min="1" style="display:none;" placeholder="Digite meses">
+    <label>Observações
+      <textarea name="observacoes"></textarea>
+    </label>
 
-        <label>Observações:
-            <textarea name="observacoes" rows="3"></textarea>
-        </label>
+    <button type="submit" class="btn btn-primary">Salvar</button>
+  </form>
 
-        <button type="submit">Salvar</button>
-    </form>
-
-    <!-- Filtro -->
-    <div class="count">Total de registros: {{ count }}</div>
-
-    <form method="get">
+  <div class="filters">
+    <form method="GET">
       {% if loja_lock %}
         <input type="hidden" name="loja" value="{{ loja_lock }}">
         <input type="hidden" name="pin" value="{{ pin }}">
+      {% else %}
+        {% if mode == "admin" %}
+          <input type="hidden" name="pin" value="{{ pin }}">
+        {% endif %}
       {% endif %}
       <label>De: <input type="date" name="inicio" value="{{ filtro_inicio }}"></label>
       <label>Até: <input type="date" name="fim" value="{{ filtro_fim }}"></label>
-      <button type="submit">Filtrar</button>
-      <a href="{{ url_for('index', loja=loja_lock, pin=pin) }}">Limpar filtro</a>
+      <button class="btn btn-secondary" type="submit">Filtrar</button>
+      {% if loja_lock %}
+        <a class="btn btn-secondary" href="{{ url_for('index', loja=loja_lock, pin=pin) }}">Limpar</a>
+      {% else %}
+        <a class="btn btn-secondary" href="{{ url_for('index', pin=pin) }}">Limpar</a>
+      {% endif %}
     </form>
+  </div>
 
-    <p>
-      <a href="{{ url_for('download_csv', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">📥 Baixar CSV</a> |
-      <a href="{{ url_for('download_pdf', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">📄 Baixar PDF</a>
-    </p>
+  <p>
+    <a class="btn btn-secondary" href="{{ url_for('download_csv', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">Baixar CSV</a>
+    <a class="btn btn-secondary" href="{{ url_for('download_pdf', loja=loja_lock, pin=pin, inicio=filtro_inicio, fim=filtro_fim) }}">Baixar PDF</a>
+  </p>
 
-    <!-- Tabela -->
-    <table>
-        <thead>
-            <tr>
-                <th>Loja</th>
-                <th>Empresa</th>
-                <th>Funcionário</th>
-                <th>Data</th>
-                <th>Hora</th>
-                <th>Prazo</th>
-                <th>Próxima Data</th>
-                <th>Observações</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in registros %}
-            <tr>
-                <td>{{ row['loja'] }}</td>
-                <td>{{ row['empresa'] }}</td>
-                <td>{{ row['funcionario'] }}</td>
-                <td>{{ row['data'] }}</td>
-                <td>{{ row['hora'] }}</td>
-                <td>{{ row['prazo'] }}</td>
-                <td>{{ row['proxima_data'] }}</td>
-                <td>{{ row['observacoes'] }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <script>
-      const prazoSelect = document.getElementById("prazo");
-      const personalizadoInput = document.getElementById("personalizado");
-      prazoSelect.addEventListener("change", function() {
-        if (this.value === "personalizado") {
-          personalizadoInput.style.display = "inline-block";
-        } else {
-          personalizadoInput.style.display = "none";
-          personalizadoInput.value = "";
-        }
-      });
-    </script>
+  <h3>Registros ({{ count }})</h3>
+  <table>
+    <tr>
+      <th>Loja</th>
+      <th>Empresa</th>
+      <th>Funcionário</th>
+      <th>Data</th>
+      <th>Hora</th>
+      <th>Prazo</th>
+      <th>Próxima Data</th>
+      <th>Observações</th>
+      <th>Ações</th>
+    </tr>
+    {% for r in registros %}
+    <tr>
+      <td>{{ r.loja }}</td>
+      <td>{{ r.empresa }}</td>
+      <td>{{ r.funcionario }}</td>
+      <td>{{ r.data }}</td>
+      <td>{{ r.hora }}</td>
+      <td>{{ r.prazo }}</td>
+      <td>{{ r.proxima_data }}</td>
+      <td style="text-align:left">{{ r.observacoes }}</td>
+      <td class="actions">
+        <a class="btn btn-primary" href="{{ url_for('edit', id=loop.index0, loja=loja_lock, pin=pin) }}">Editar</a>
+        <a class="btn btn-danger" href="{{ url_for('delete', id=loop.index0, loja=loja_lock, pin=pin) }}" onclick="return confirm('Apagar este registro?');">Apagar</a>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9">Nenhum registro</td></tr>
+    {% endfor %}
+  </table>
 </body>
 </html>
